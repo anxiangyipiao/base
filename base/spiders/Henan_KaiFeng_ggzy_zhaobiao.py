@@ -1,8 +1,6 @@
 import time
 from .base import BaseListSpider,BaseItem,RequestItem
 
-
-
 class Henan_Pindingshan_ggzy_zhaobiaoSpider(BaseListSpider):
     # ggzy: 公共资源网     zfcg：政府采购
     name = "Pindingshan"
@@ -17,8 +15,6 @@ class Henan_Pindingshan_ggzy_zhaobiaoSpider(BaseListSpider):
     county = ""  # 选填，爬虫区/县
     site_name = '平顶山市公共资源交易中心'
     source = 'ggzy.pds.gov.cn'
-
-
 
     def start_requests(self):
 

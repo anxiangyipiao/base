@@ -54,7 +54,7 @@ DOWNLOADER_MIDDLEWARES = {
    "base.middlewares.BaseDownloaderMiddleware": 543, 
    "base.middlewares.BaseHeaderMiddleware": 1, # 添加请求头
    "base.middlewares.BaseListRetryMiddleware": 2, # 列表页重试
-   "base.middlewares.CustomRetryMiddleware": 3, # 详情页重试
+   # "base.middlewares.CustomRetryMiddleware": 3, # 详情页重试
 }
 
 
