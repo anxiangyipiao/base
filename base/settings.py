@@ -25,7 +25,7 @@ ROBOTSTXT_OBEY = False
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-#DOWNLOAD_DELAY = 3
+DOWNLOAD_DELAY = 3
 # The download delay setting will honor only one of:
 #CONCURRENT_REQUESTS_PER_DOMAIN = 16
 #CONCURRENT_REQUESTS_PER_IP = 16
@@ -51,14 +51,15 @@ ROBOTSTXT_OBEY = False
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
-   "base.middlewares.BaseDownloaderMiddleware": 543,
-   "base.middlewares.BaseHeaderMiddleware": 1,
-   "base.middlewares.CustomRetryMiddleware": 2,
+   "base.middlewares.BaseDownloaderMiddleware": 543, 
+   "base.middlewares.BaseHeaderMiddleware": 1, # 添加请求头
+   "base.middlewares.BaseListRetryMiddleware": 2, # 列表页重试
+   "base.middlewares.CustomRetryMiddleware": 3, # 详情页重试
 }
 
 
 RETRY_ENABLED = True  # 启用重试
-RETRY_TIMES = 2  # 最大重试次数
+RETRY_TIMES = 3  # 最大重试次数
 RETRY_HTTP_CODES = [500, 502, 503, 504, 400, 403, 404, 408]  # 需要重试的HTTP状态码
 RETRY_PRIORITY_ADJUST = -1
 
@@ -70,9 +71,9 @@ RETRY_PRIORITY_ADJUST = -1
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    "base.pipelines.BasePipeline": 300,
-#}
+ITEM_PIPELINES = {
+   "base.pipelines.BasePipeline": 300,
+}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html

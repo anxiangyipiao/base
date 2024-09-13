@@ -25,7 +25,7 @@ class BaseListSpider(scrapy.Spider):
     source = None # 网站
     
 
-    timeRange = 1
+    timeRange = 2
     start_time = datetime.now() # 爬虫开始时间
     end_time = None # 爬虫结束时间
     insertCount = 0 # 总任务数量
@@ -99,6 +99,7 @@ class BaseListSpider(scrapy.Spider):
             bool: 若给定的时间点超出了设定的时间范围，则返回True；否则返回False。
         
         """
+
 
         if abs((time - self.start_time).days) > self.timeRange:
             return True
@@ -274,10 +275,14 @@ class BaseListSpider(scrapy.Spider):
         try:
             data = {
                 'source': self.source,
+                'all_request': self.insertCount,
+                'success_request': self.successCount,
+                'fail_request': self.insertCount - self.successCount,
                 'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             }
 
             self.task_redis_server.lpush('success',json.dumps(data))
+
         except:
             logger.error("Insert success queue error")
 
@@ -285,9 +290,13 @@ class BaseListSpider(scrapy.Spider):
         try:
             data = {
                 'source': self.source,
+                'all_request': self.insertCount,
+                'success_request': self.successCount,
+                'fail_request': self.insertCount - self.successCount,
                 'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             }
             self.task_redis_server.lpush('fail',json.dumps(data))
+
         except:
             logger.error("Insert fail queue error")
 

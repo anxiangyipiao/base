@@ -27,7 +27,7 @@ class Henan_Pindingshan_ggzy_zhaobiaoSpider(BaseListSpider):
             time.sleep(1)
             full_url = url.format(page=1)
      
-             # 设置请求参数
+            # 设置请求参数
             request_params = {
                 'request_body': None,
                 'url': full_url,

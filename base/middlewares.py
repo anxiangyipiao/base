@@ -107,6 +107,7 @@ class BaseDownloaderMiddleware:
         spider.logger.info("Spider opened: %s" % spider.name)
 
 
+
 class BaseHeaderMiddleware:
 
     def process_request(self, request, spider):
@@ -118,15 +119,59 @@ class BaseHeaderMiddleware:
         return None
 
 
+# 从start_requests中发送的请求无限重试次数
+class BaseListRetryMiddleware(RetryMiddleware):
+    
+        EXCEPTIONS_TO_RETRY = (TimeoutError, ConnectionRefusedError,
+                            IOError, ValueError)
+    
+        def process_exception(self, request, exception, spider):        
+                
+                if request.callback.__name__ == 'parse':
+                    
+                    if isinstance(exception, self.EXCEPTIONS_TO_RETRY) \
+                            and not request.meta.get('dont_retry', False):
+                            retryreq = request.copy()
+                            retryreq.priority = request.priority + self.priority_adjust
+                            retryreq.dont_filter = True
+                            retryreq.headers['Cache-Control'] = 'no-cache'
+                            return retryreq
+                    
+
+        def get_proxy(self, request):
+        # 根据请求动态获取代理地址
+        # 这里仅作为一个示例，实际应用中应根据具体情况来选择代理
+            proxies = [
+                "http://proxy1.example.com:8080",
+            ]
+            return proxies[0]                
+          
+ 
+# 
 class CustomRetryMiddleware(RetryMiddleware):
+
     EXCEPTIONS_TO_RETRY = (TimeoutError, 
                            ConnectionRefusedError,
                            IOError, ValueError)
 
+    def process_request(self, request, spider):
+
+        if request.callback.__name__ == 'parse_content_detal':
+
+            print('parse_content_detal')
+
+        return None
+    
+    def process_response(self, request, response, spider):
+         
+        if request.callback.__name__ == 'parse_content_detal':
+             pass
+        return response
+   
     def process_exception(self, request, exception, spider):
         
-        if isinstance(exception, self.EXCEPTIONS_TO_RETRY) \
-                and not request.meta.get('dont_retry', False):
+        if request.callback.__name__ == 'parse_content_detal':
+            
             retries = request.meta.get('retry_times', 0) + 1
 
             if retries <= self.max_retry_times:
@@ -139,10 +184,10 @@ class CustomRetryMiddleware(RetryMiddleware):
                 retryreq.dont_filter = True
                 retryreq.headers['Cache-Control'] = 'no-cache'
                 
-                # 添加代理支持
-                proxy = self.get_proxy(request)
-                if proxy:
-                    retryreq.meta['proxy'] = proxy
+                # # 添加代理支持
+                # proxy = self.get_proxy(request)
+                # if proxy:
+                #     retryreq.meta['proxy'] = proxy
                 
                 return retryreq
             else:
