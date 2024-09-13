@@ -1,4 +1,3 @@
-
 import json
 from scrapy.exceptions import CloseSpider
 import scrapy
@@ -14,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class BaseListSpider(scrapy.Spider):
 
-    name = "list_base"
+    name = "base"
     start_urls = []
 
     next_base_urls = ''  # 用于下一页网址拼接
@@ -26,7 +25,7 @@ class BaseListSpider(scrapy.Spider):
     source = None # 网站
     
 
-    timeRange = 4
+    timeRange = 1
     start_time = datetime.now() # 爬虫开始时间
     end_time = None # 爬虫结束时间
     insertCount = 0 # 总任务数量
@@ -277,6 +276,7 @@ class BaseListSpider(scrapy.Spider):
                 'source': self.source,
                 'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             }
+
             self.task_redis_server.lpush('success',json.dumps(data))
         except:
             logger.error("Insert success queue error")
@@ -295,16 +295,16 @@ class BaseListSpider(scrapy.Spider):
     def closed(self, reason):
 
 
-        if reason['reason'] == 'crawl list stop':
+        if reason == 'crawl list stop':
 
             if self.insertCount == self.successCount:
                 # 将爬取的网站插入到success队列
-                self.task_redis_server.lpush('success',self.source)
+                self.insert_success()
                 logger.info("Spider closed: success" )
 
             if self.insertCount > self.successCount:
                 # 将爬取的网站插入到fail队列
-                self.task_redis_server.lpush('fail',self.source)
+                self.insert_fail()
                 logger.info("Spider closed: fail")
         
         

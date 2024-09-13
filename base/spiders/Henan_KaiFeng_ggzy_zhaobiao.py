@@ -1,6 +1,5 @@
 import time
-import scrapy
-from .list_base import BaseListSpider,BaseItem,RequestItem
+from .base import BaseListSpider,BaseItem,RequestItem
 
 
 
