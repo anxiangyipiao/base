@@ -24,13 +24,14 @@ class BaseListSpider(scrapy.Spider):
     site_name = None
     source = None # 网站
     
-    timeRange = 2
-    start_time = datetime.now() # 爬虫开始时间
+    timeRange = 10
+    crawl_today = datetime.now() # 爬虫开始时间
     end_time = None # 爬虫结束时间
     insertCount = 0 # 总任务数量
     successCount = 0 # 成功数量
   
-    task_redis_server = RedisConnectionManager.get_connection() # Redis连接
+    task_redis_server = RedisConnectionManager.get_connection(db=0) # Redis连接
+   
 
     '''# @classmethod
     # def from_crawler(cls, crawler, *args, **kwargs):
@@ -100,7 +101,7 @@ class BaseListSpider(scrapy.Spider):
         """
 
 
-        if abs((time - self.start_time).days) > self.timeRange:
+        if abs((time - self.crawl_today).days) > self.timeRange:
             return True
 
         return False
@@ -258,7 +259,11 @@ class BaseListSpider(scrapy.Spider):
         except:
             logger.error("Insert time queue error")
 
-    def init_source_log(self):
+
+    def get_key(self):
+        return  "task_log:" + self.source + ":" + self.crawl_today.strftime('%Y-%m-%d')
+
+    def init_source_log(self,key):
        
         # 参数1 今天网站更新的总数量
         # 参数2 今天网站爬取的成功数量
@@ -269,45 +274,64 @@ class BaseListSpider(scrapy.Spider):
         # key 为 source + 日期
 
         data = {
-            'time': datetime.now().strftime('%Y-%m-%d'),
+            'time': self.crawl_today.strftime('%Y-%m-%d'),
             'all_request': 0,
             'success_request': 0,
             'fail_request': 0,
-            'last_time': None,
+            'last_time': '',
             'crawl_count': 0,
         }
 
-        key = self.source + datetime.now().strftime('%Y-%m-%d')
+        # hash 结构存储
 
-        # 如果key不存在则插入到redis中
         if not self.task_redis_server.exists(key):
-            
-            self.task_redis_server.set(key,json.dumps(data))
+                
+            self.task_redis_server.hmset(key, data)
+       
 
-    def read_source_log(self)->dict:
+    def read_source_log(self,key):
 
-        key = self.source + datetime.now().strftime('%Y-%m-%d')
-        
-        data = self.task_redis_server.get(key)
+        data = self.task_redis_server.hgetall(key)
 
-        return json.loads(data)
+        # 转为字典
+        return {
+            'time': data[b'time'].decode('utf-8'),
+            'all_request': int(data[b'all_request'].decode('utf-8')),
+            'success_request': int(data[b'success_request'].decode('utf-8')),
+            'fail_request': int(data[b'fail_request'].decode('utf-8')),
+            'last_time': data[b'last_time'].decode('utf-8'),
+            'crawl_count': int(data[b'crawl_count'].decode('utf-8'))
+        }
+  
 
-    def write_source_log(self,data:dict):
+    def write_source_log(self,key,data:dict):
 
-        key = self.source + datetime.now().strftime('%Y-%m-%d')
-
-        self.task_redis_server.set(key,json.dumps(data))
+        self.task_redis_server.hmset(key, data)
 
     def insert_task_log(self):
+        """
+        插入任务日志
+        
+        Args:
+            无参数
+        
+        Returns:
+            无返回值
+        
+        Raises:
+            无异常抛出
+        
+        """
+        key = self.get_key()
 
         # 初始化日志
-        self.init_source_log()
+        self.init_source_log(key)
 
         # 读取日志
-        data = self.read_source_log()
+        data = self.read_source_log(key)
 
         # 计算总数量
-        data['all_request'] += self.insertCount
+        data['all_request'] =data['all_request'] +  self.insertCount -  data['fail_request']
 
         # 计算成功数量
         data['success_request'] += self.successCount
@@ -322,44 +346,17 @@ class BaseListSpider(scrapy.Spider):
         data['crawl_count'] += 1
 
 
-        try:
-            data = {
-                'source': self.source,
-                'all_request': self.insertCount,
-                'success_request': self.successCount,
-                'fail_request': self.insertCount - self.successCount,
-                'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            }
+        # 写入日志
+        self.write_source_log(key,data)
 
-            self.task_redis_server.lpush('success',json.dumps(data))
-
-        except:
-            logger.error("Insert success queue error")
-
+ 
     # 爬虫关闭时调用
     def closed(self, reason):
 
-        if reason == 'Time Stop Condition Met':
+        # if reason == 'Time Stop Condition Met':
             
             self.insert_task_log()
 
-
-
-            # if self.insertCount == self.successCount:
-            #     # 将爬取的网站插入到success队列
-            #     self.insert_success()
-            #     logger.info("Spider closed: success" )
-
-            # if self.insertCount > self.successCount:
-            #     # 将爬取的网站插入到fail队列
-            #     self.insert_fail()
-            #     logger.info("Spider closed: fail")
-        
-        
-
-        # self.insert_task_schedule()
-        # logger.info("Spider closed: %s" % reason['reason'])    
-        # logger.info("Spider closed: %s" % reason)
 
     def parse_task(self,tasks:RequestItem):
 
