@@ -24,7 +24,6 @@ class BaseListSpider(scrapy.Spider):
     site_name = None
     source = None # 网站
     
-
     timeRange = 2
     start_time = datetime.now() # 爬虫开始时间
     end_time = None # 爬虫结束时间
@@ -148,7 +147,7 @@ class BaseListSpider(scrapy.Spider):
 
         return time
     
-    def is_url_stop(self, url:str)->bool:
+    def is_url_having(self, url:str)->bool:
         """
         判断给定的URL是否在布隆过滤器中。
         
@@ -156,18 +155,30 @@ class BaseListSpider(scrapy.Spider):
             url (str): 待判断的URL。
         
         Returns:
-            bool: 若URL在布隆过滤器中，返回True；否则返回False,并添加该url到布隆过滤器。
+            bool: 若URL在布隆过滤器中，返回True；否则返回False
         """
         
         if bloomFilter.is_contained(url):
             return True
+        
+        return False
+    
+    def add_url(self,url:str):
+        """
+        将给定的URL添加到布隆过滤器中。
+        
+        Args:
+            url (str): 待添加的URL。
+        
+        Returns:
+            None
+        """
+        
         try:
             bloomFilter.add(url)
         except:
             logger.error("BloomFilter add error")
 
-        return False
-    
     def is_time_stop(self,publishTime:str)->bool:
         """
         判断当前时间是否超过了发布时间所指定的时间限制
@@ -183,22 +194,6 @@ class BaseListSpider(scrapy.Spider):
         
         return self.is_time_out(time)
     
-    # 判断网站是否已经爬取过，通过布隆过滤器和时间限制一起判断
-    def is_stop(self, url:str, publishTime:str)->bool:
-        """
-        判断给定的URL是否已经爬取过。
-        
-        Args:
-            url (str): 待判断的URL。
-            publishTime (str): 发布时间，格式为"%Y-%m-%d %H:%M:%S"。
-        
-        Returns:
-            bool: 若URL已经爬取过，或者发布时间超出了设定的时间范围，则返回True；否则返回False。
-        
-        """        
- 
-        return self.is_url_stop(url) or self.is_time_stop(publishTime)
-    
     def calculate_task_item(self,task:BaseItem):
         """
 
@@ -211,7 +206,6 @@ class BaseListSpider(scrapy.Spider):
         """
 
         # 检查task['url'],task['publish_time'] 是否为空
-
         if task['url'] is None:
             # 将url插入到url_error队列
             self.insert_url_error()
@@ -221,32 +215,25 @@ class BaseListSpider(scrapy.Spider):
             self.insert_time_error()
             raise CloseSpider('time xpath is changed')
 
-        # 检查任务是否满足停止条件
-        if self.is_stop(task['url'],task['publish_time']): 
-           raise CloseSpider('crawl list stop')
-        else:
-            try:
-                self.insertCount += 1
+        # 检查任务是否满足停止条件,如果时间超过timeRange天则停止爬取
+        if self.is_time_stop(task['publish_time']):
+            
+            self.log("Stopping spider due to time condition.")
+            raise CloseSpider(reason='Time Stop Condition Met')
+ 
+        # 检查任务是否满足停止条件,如果url已经爬取过则跳过
+        if self.is_url_having(task['url']):
+            self.log("Url exit.")
+            return False
 
-            except Exception as e:
+        # 计算任务数量
+        try:           
+                self.insertCount += 1
+        except Exception as e:
                 self.insertCount -= 1
                 logger.error("Insert task item error",e)
 
-    def insert_task_schedule(self):
-
-        data = {
-            'all': self.insertCount,
-            'success': self.successCount,
-            'fail': self.insertCount - self.successCount,
-        }
-
-
-        # 使用hash存储key：爬取的网站和和value:爬取的数量
-        # 用来记录每个网站爬取的数量
-        try:
-            self.task_redis_server.hset('schedule', self.source, json.dumps(data))
-        except:
-            logger.error("Insert task list_schedule error")
+        return True
 
     def insert_url_error(self):
         
@@ -271,7 +258,70 @@ class BaseListSpider(scrapy.Spider):
         except:
             logger.error("Insert time queue error")
 
-    def insert_success(self):
+    def init_source_log(self):
+       
+        # 参数1 今天网站更新的总数量
+        # 参数2 今天网站爬取的成功数量
+        # 参数3 今天网站爬取的失败数量 
+        # 参数4 今天的日期
+        # 参数5 最近一次爬取的时间
+        # 参数6 今天爬取的次数
+        # key 为 source + 日期
+
+        data = {
+            'time': datetime.now().strftime('%Y-%m-%d'),
+            'all_request': 0,
+            'success_request': 0,
+            'fail_request': 0,
+            'last_time': None,
+            'crawl_count': 0,
+        }
+
+        key = self.source + datetime.now().strftime('%Y-%m-%d')
+
+        # 如果key不存在则插入到redis中
+        if not self.task_redis_server.exists(key):
+            
+            self.task_redis_server.set(key,json.dumps(data))
+
+    def read_source_log(self)->dict:
+
+        key = self.source + datetime.now().strftime('%Y-%m-%d')
+        
+        data = self.task_redis_server.get(key)
+
+        return json.loads(data)
+
+    def write_source_log(self,data:dict):
+
+        key = self.source + datetime.now().strftime('%Y-%m-%d')
+
+        self.task_redis_server.set(key,json.dumps(data))
+
+    def insert_task_log(self):
+
+        # 初始化日志
+        self.init_source_log()
+
+        # 读取日志
+        data = self.read_source_log()
+
+        # 计算总数量
+        data['all_request'] += self.insertCount
+
+        # 计算成功数量
+        data['success_request'] += self.successCount
+
+        # 计算失败数量
+        data['fail_request'] = data['all_request'] - data['success_request']
+
+        # 计算最近一次爬取时间
+        data['last_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # 计算爬取次数
+        data['crawl_count'] += 1
+
+
         try:
             data = {
                 'source': self.source,
@@ -286,35 +336,24 @@ class BaseListSpider(scrapy.Spider):
         except:
             logger.error("Insert success queue error")
 
-    def insert_fail(self):
-        try:
-            data = {
-                'source': self.source,
-                'all_request': self.insertCount,
-                'success_request': self.successCount,
-                'fail_request': self.insertCount - self.successCount,
-                'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            }
-            self.task_redis_server.lpush('fail',json.dumps(data))
-
-        except:
-            logger.error("Insert fail queue error")
-
     # 爬虫关闭时调用
     def closed(self, reason):
 
+        if reason == 'Time Stop Condition Met':
+            
+            self.insert_task_log()
 
-        if reason == 'crawl list stop':
 
-            if self.insertCount == self.successCount:
-                # 将爬取的网站插入到success队列
-                self.insert_success()
-                logger.info("Spider closed: success" )
 
-            if self.insertCount > self.successCount:
-                # 将爬取的网站插入到fail队列
-                self.insert_fail()
-                logger.info("Spider closed: fail")
+            # if self.insertCount == self.successCount:
+            #     # 将爬取的网站插入到success队列
+            #     self.insert_success()
+            #     logger.info("Spider closed: success" )
+
+            # if self.insertCount > self.successCount:
+            #     # 将爬取的网站插入到fail队列
+            #     self.insert_fail()
+            #     logger.info("Spider closed: fail")
         
         
 
@@ -350,8 +389,11 @@ class BaseListSpider(scrapy.Spider):
         # 计算成功数量
         self.successCount += 1
 
-        yield item
+        # 将url插入到布隆过滤器
+        self.add_url(item['url'])
 
+        yield item
+    
     def parse_content(self,response)->BaseItem:
          
 

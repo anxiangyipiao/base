@@ -35,7 +35,6 @@ class Henan_Pindingshan_ggzy_zhaobiaoSpider(BaseListSpider):
                 'params': None
             }
 
-
             yield self.parse_task(RequestItem(**request_params))
 
     def parse(self, response):
@@ -60,10 +59,11 @@ class Henan_Pindingshan_ggzy_zhaobiaoSpider(BaseListSpider):
 
 
             # 判断是否继续爬取
-            self.calculate_task_item(baseItem)
+            if self.calculate_task_item(baseItem):
 
-            # 爬取详情页
-            yield self.parse_task(RequestItem(**request_params))
+                # 爬取详情页
+                yield self.parse_task(RequestItem(**request_params))
+
 
 
         page += 1
