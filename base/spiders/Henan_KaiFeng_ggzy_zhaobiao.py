@@ -1,11 +1,12 @@
 import time
-from .base import BaseListSpider,BaseItem,RequestItem
+from .base import BaseListSpider,RequestItem
 
 class Henan_Pindingshan_ggzy_zhaobiaoSpider(BaseListSpider):
     # ggzy: 公共资源网     zfcg：政府采购
     name = "Pindingshan"
     start_urls = [
         'http://ggzy.pds.gov.cn/gzbgg/index_{page}.jhtml',
+       " http://ggzy.pds.gov.cn/zzbgg/index_{page}.jhtml"
     ]
     
     next_base_urls = ''  # 用于下一页网址拼接

@@ -7,6 +7,7 @@ from datetime import datetime
 from base.items import BaseItem,RequestItem
 from scrapy import signals
 import logging
+import re
 
 
 logger = logging.getLogger(__name__)
@@ -102,7 +103,25 @@ class BaseListSpider(scrapy.Spider):
             return True
 
         return False
- 
+    
+    # 提取数字
+    def extract_number(self, string:str)->str:
+        """
+        从字符串中提取2024-11-12。
+        
+        Args:
+            string (str): 待提取的字符串。
+        
+        Returns:
+            str: 提取出的数字字符串。
+        
+        """
+        try:
+            number = re.search(r'\d{4}-\d{2}-\d{2}', string).group()
+        except:
+            number = None
+        return number
+
     def format_time(self, publish_time)->datetime:
         """
         格式化时间字符串，将发布时间转换为 datetime 对象。
@@ -132,6 +151,9 @@ class BaseListSpider(scrapy.Spider):
             publish_time = publish_time.replace('月', '-')
         if '日' in publish_time:
             publish_time = publish_time.replace('日', '')
+
+
+        publish_time = self.extract_number(publish_time)
 
         if len(publish_time) > 10:
             publish_time = publish_time[:10]
