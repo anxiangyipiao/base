@@ -53,15 +53,15 @@ DOWNLOAD_DELAY = 3
 DOWNLOADER_MIDDLEWARES = {
    "base.middlewares.BaseDownloaderMiddleware": 543, 
    "base.middlewares.BaseHeaderMiddleware": 1, # 添加请求头
-   "base.middlewares.BaseListRetryMiddleware": 2, # 列表页重试
+   "base.middlewares.BaseRetryMiddleware": 2, # 重试
    # "base.middlewares.CustomRetryMiddleware": 3, # 详情页重试
 }
 
 
 RETRY_ENABLED = True  # 启用重试
 RETRY_TIMES = 3  # 最大重试次数
-RETRY_HTTP_CODES = [500, 502, 503, 504, 400, 403, 404, 408]  # 需要重试的HTTP状态码
-RETRY_PRIORITY_ADJUST = -1
+# RETRY_HTTP_CODES = [500, 502, 503, 504, 400, 403, 404, 408]  # 需要重试的HTTP状态码
+# RETRY_PRIORITY_ADJUST = -1
 
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html

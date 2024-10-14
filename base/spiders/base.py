@@ -50,7 +50,6 @@ class BaseListSpider(scrapy.Spider):
     #     return spider
     '''
     
- 
     def get_base_item(self)->BaseItem:
         """
         返回一个包含基本信息的 BaseItem 对象。
@@ -99,8 +98,6 @@ class BaseListSpider(scrapy.Spider):
             bool: 若给定的时间点超出了设定的时间范围，则返回True；否则返回False。
         
         """
-
-
         if abs((time - self.crawl_today).days) > self.timeRange:
             return True
 
@@ -259,7 +256,6 @@ class BaseListSpider(scrapy.Spider):
         except:
             logger.error("Insert time queue error")
 
-
     def get_key(self):
         return  "task_log:" + self.source + ":" + self.crawl_today.strftime('%Y-%m-%d')
 
@@ -288,7 +284,6 @@ class BaseListSpider(scrapy.Spider):
                 
             self.task_redis_server.hmset(key, data)
        
-
     def read_source_log(self,key):
 
         data = self.task_redis_server.hgetall(key)
@@ -303,7 +298,6 @@ class BaseListSpider(scrapy.Spider):
             'crawl_count': int(data[b'crawl_count'].decode('utf-8'))
         }
   
-
     def write_source_log(self,key,data:dict):
 
         self.task_redis_server.hmset(key, data)
@@ -349,14 +343,16 @@ class BaseListSpider(scrapy.Spider):
         # 写入日志
         self.write_source_log(key,data)
 
- 
+
+        # 输出日志
+        logger.info("source: %s, time: %s, all_request: %d, success_request: %d, fail_request: %d, last_time: %s, crawl_count: %d" % (self.source,data['time'],data['all_request'],data['success_request'],data['fail_request'],data['last_time'],data['crawl_count']))
+        
     # 爬虫关闭时调用
     def closed(self, reason):
 
         # if reason == 'Time Stop Condition Met':
             
             self.insert_task_log()
-
 
     def parse_task(self,tasks:RequestItem):
 
