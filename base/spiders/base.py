@@ -25,15 +25,15 @@ class BaseListSpider(scrapy.Spider):
     site_name = None
     source = None # 网站
     
-    timeRange = 10
+    timeRange = 0
     crawl_today = datetime.now() # 爬虫开始时间
     end_time = None # 爬虫结束时间
     insertCount = 0 # 总任务数量
     successCount = 0 # 成功数量
+    failed_urls = [] # 失败的url
   
     task_redis_server = RedisConnectionManager.get_connection(db=0) # Redis连接
    
-
     '''# @classmethod
     # def from_crawler(cls, crawler, *args, **kwargs):
     #     """
@@ -99,7 +99,7 @@ class BaseListSpider(scrapy.Spider):
             bool: 若给定的时间点超出了设定的时间范围，则返回True；否则返回False。
         
         """
-        if abs((time - self.crawl_today).days) > self.timeRange:
+        if abs((time.date() - self.crawl_today.date()).days) > self.timeRange:
             return True
 
         return False
@@ -289,6 +289,7 @@ class BaseListSpider(scrapy.Spider):
         # 参数4 今天的日期
         # 参数5 最近一次爬取的时间
         # 参数6 今天爬取的次数
+        # 参数7 失败的url,存储的是url的列表
         # key 为 source + 日期
 
         data = {
@@ -298,6 +299,7 @@ class BaseListSpider(scrapy.Spider):
             'fail_request': 0,
             'last_time': '',
             'crawl_count': 0,
+            'failed_urls': json.dumps([])
         }
 
         # hash 结构存储
@@ -317,11 +319,13 @@ class BaseListSpider(scrapy.Spider):
             'success_request': int(data[b'success_request'].decode('utf-8')),
             'fail_request': int(data[b'fail_request'].decode('utf-8')),
             'last_time': data[b'last_time'].decode('utf-8'),
-            'crawl_count': int(data[b'crawl_count'].decode('utf-8'))
+            'crawl_count': int(data[b'crawl_count'].decode('utf-8')),
+            'failed_urls':  json.loads(data[b'failed_urls'].decode('utf-8'))
         }
   
     def write_source_log(self,key,data:dict):
-
+        
+        data['failed_urls'] = json.dumps(data['failed_urls'])
         self.task_redis_server.hmset(key, data)
 
     def insert_task_log(self):
@@ -347,7 +351,7 @@ class BaseListSpider(scrapy.Spider):
         data = self.read_source_log(key)
 
         # 计算总数量
-        data['all_request'] =data['all_request'] +  self.insertCount -  data['fail_request']
+        data['all_request'] = data['all_request'] +  self.insertCount -  data['fail_request']
 
         # 计算成功数量
         data['success_request'] += self.successCount
@@ -361,10 +365,14 @@ class BaseListSpider(scrapy.Spider):
         # 计算爬取次数
         data['crawl_count'] += 1
 
+        # 计算失败的url
+        if len(self.failed_urls) != 0:
+            for i in self.failed_urls:
+                if i not in data['failed_urls']:
+                    data['failed_urls'].append(i)
 
         # 写入日志
         self.write_source_log(key,data)
-
 
         # 输出日志
         logger.info("source: %s, time: %s, all_request: %d, success_request: %d, fail_request: %d, last_time: %s, crawl_count: %d" % (self.source,data['time'],data['all_request'],data['success_request'],data['fail_request'],data['last_time'],data['crawl_count']))
@@ -409,6 +417,11 @@ class BaseListSpider(scrapy.Spider):
 
         yield item
     
+    def errback_httpbin(self,failure):
+       
+        request = failure.request
+        self.failed_urls.append(request.url)
+        
     def parse_content(self,response)->BaseItem:
          
 
